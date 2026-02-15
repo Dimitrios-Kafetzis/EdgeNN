@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-15
-**Author:** Dimitris / DeepSea Technologies IoT Department
+**Author:** Dimitrios Kafetzis / PhD Researcher @ Athens University of Economics and Business & Director of IoT Department @ DeepSea Technologies
 
 ---
 
