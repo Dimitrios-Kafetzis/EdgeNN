@@ -1,0 +1,24 @@
+# Build output
+build/
+build-*/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.lib
+*.exe
+*.out
+
+# Development-only files (not for public distribution)
+CLAUDE.md
+docs/IMPLEMENTATION_PLAN.md
