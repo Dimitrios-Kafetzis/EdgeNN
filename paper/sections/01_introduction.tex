@@ -1,0 +1,44 @@
+% =============================================================================
+% Section 1: Introduction (~1.5 pages)
+% =============================================================================
+
+\section{Introduction}
+\label{sec:introduction}
+
+% --- Opening paragraph: The problem ---
+% Edge AI inference on MCUs is critical for latency-sensitive, privacy-preserving,
+% bandwidth-constrained applications. MCU constraints: 64KB-2MB SRAM, 256KB-2MB
+% Flash, no MMU, often bare-metal or minimal RTOS. Need for deterministic,
+% bounded-latency inference in safety-critical systems.
+%
+% TODO: Write opening paragraph
+
+% --- Paragraph 2: Existing solutions and their limitations ---
+% TFLite Micro, CMSIS-NN, microTVM, X-CUBE-AI, TinyEngine
+%
+% TODO: Write existing solutions paragraph
+
+% --- Key gap statement ---
+% TODO: Write gap statement
+
+% --- Paragraph 3: Our contribution (EdgeNN) ---
+% Enumerate 5-6 specific contributions:
+% 1. Pure C11 library with zero dynamic allocation
+% 2. Quantization-first design: INT8 symmetric, per-channel, INT16 for sensitive layers
+% 3. Full operator coverage: DNN + RNN + Transformer
+% 4. Layered HAL with generic C fallback and optimized backends
+% 5. Static graph runtime with ping-pong buffer scheme
+% 6. Model partitioning support for distributed edge inference
+%
+% TODO: Write contributions paragraph
+
+% --- Paragraph 4: Paper organization ---
+% TODO: Write organization paragraph
+
+% Key references to cite:
+% \cite{david2021tensorflow}  — TFLite Micro
+% \cite{lai2018cmsis}         — CMSIS-NN
+% \cite{lin2020mcunet}        — MCUNet
+% \cite{lin2021mcunetv2}      — TinyEngine / MCUNetV2
+% \cite{chen2018tvm}          — TVM / microTVM
+% \cite{kafetzis2025wiopt}    — Your WiOpt 2025 paper

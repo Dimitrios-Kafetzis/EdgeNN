@@ -1,0 +1,61 @@
+% =============================================================================
+% Section 3: Design Principles (~1 page)
+% =============================================================================
+
+\section{Design Principles}
+\label{sec:design_principles}
+
+% Present 5 core principles with justification.
+
+% ---------------------------------------------------------------------------
+\subsection{P1: Zero-Allocation Inference}
+\label{sec:p1_zero_alloc}
+
+% Problem: malloc/free introduces jitter (15-40us per call), fragmentation,
+% non-deterministic execution time.
+% Solution: All memory pre-planned at model load time; inference uses only
+% pre-allocated arena buffers.
+% Quantify: Deterministic cycle count variance (<1%) vs TFLite Micro.
+%
+% TODO: Write P1
+
+% ---------------------------------------------------------------------------
+\subsection{P2: Tensor Descriptor, Not Object}
+\label{sec:p2_tensor_descriptor}
+
+% Problem: Object-oriented tensor abstractions carry overhead.
+% Solution: Lightweight 80-byte struct with pointer + shape + strides + qparams.
+% Benefit: Zero-cost abstraction.
+%
+% TODO: Write P2
+
+% ---------------------------------------------------------------------------
+\subsection{P3: Quantization-First Design}
+\label{sec:p3_quantization_first}
+
+% Problem: Retrofitting quantization onto float-first libraries is suboptimal.
+% Solution: INT8 is primary; FP32 is fallback for reference/validation.
+% INT16 for accumulation-sensitive ops (LSTM cell state, attention scores).
+% Fixed-point multiplier+shift for requantization without runtime float.
+%
+% TODO: Write P3
+
+% ---------------------------------------------------------------------------
+\subsection{P4: Layered HAL with Generic Fallback}
+\label{sec:p4_layered_hal}
+
+% Problem: ARM-optimized intrinsics are not portable; pure C is slow.
+% Solution: Every operator has generic C + ifdef optimized backends.
+% Supports: CMSIS-NN, Helium/MVE, NEON at compile time.
+%
+% TODO: Write P4
+
+% ---------------------------------------------------------------------------
+\subsection{P5: Modular Architecture with Dead Code Elimination}
+\label{sec:p5_modular}
+
+% Problem: TFLite Micro's monolithic interpreter pulls in unused code.
+% Solution: LTO with -ffunction-sections -fdata-sections -Wl,--gc-sections.
+% Only operators used in the model are included in the final binary.
+%
+% TODO: Write P5

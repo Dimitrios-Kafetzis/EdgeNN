@@ -1,0 +1,49 @@
+% =============================================================================
+% Section 4: System Architecture (~2 pages)
+% =============================================================================
+
+\section{System Architecture}
+\label{sec:architecture}
+
+% ---------------------------------------------------------------------------
+\subsection{Architecture Overview}
+\label{sec:arch_overview}
+
+% Present the 6-layer stack diagram (Figure 1).
+% Explain layer dependencies and the flow from user API to hardware.
+%
+% TODO: Write overview and reference architecture_stack figure
+
+% ---------------------------------------------------------------------------
+\subsection{Memory Management}
+\label{sec:arch_memory}
+
+% Arena allocator: bump pointer, O(1) allocation, zero fragmentation.
+% Ping-pong buffer scheme: two buffers alternate between layers.
+% Memory planning: dry-run at model load for peak scratch, weight memory.
+% Diagram: Flash zones vs SRAM zones.
+% Memory budget analysis for three example models.
+%
+% TODO: Write memory management subsection
+% TODO: Reference arena_pingpong figure
+
+% ---------------------------------------------------------------------------
+\subsection{Tensor Descriptor Design}
+\label{sec:arch_tensor}
+
+% Show the struct definition (code listing).
+% Explain quantization parameters (per-tensor, per-channel, fixed-point).
+% Layout support (NHWC, NCHW, NC, NTC) and stride computation.
+%
+% TODO: Write tensor descriptor subsection
+
+% ---------------------------------------------------------------------------
+\subsection{Static Graph Runtime}
+\label{sec:arch_runtime}
+
+% Layer descriptor array with op_type, params pointer, tensor indices.
+% Sequential execution with kernel dispatch.
+% Profiling hooks (cycle counter per layer).
+% Comparison with TFLite Micro's interpreter dispatch.
+%
+% TODO: Write runtime subsection

@@ -1,0 +1,43 @@
+% =============================================================================
+% Section 6: Quantization Pipeline (~1 page)
+% =============================================================================
+
+\section{Quantization Pipeline}
+\label{sec:quantization}
+
+% ---------------------------------------------------------------------------
+\subsection{Quantization Scheme}
+\label{sec:quant_scheme}
+
+% Symmetric INT8 for weights (zero_point = 0).
+% Asymmetric or symmetric INT8 for activations.
+% Per-channel quantization for convolution and dense weights.
+% Compatibility with TFLite QAT exports.
+%
+% TODO: Write quantization scheme subsection
+% TODO: Reference quantization_pipeline figure
+
+% ---------------------------------------------------------------------------
+\subsection{Fixed-Point Requantization}
+\label{sec:quant_requantize}
+
+% The multiplier+shift decomposition:
+%   real_mult = (in_scale * weight_scale) / out_scale
+% Decompose via frexp() into normalized significand [0.5, 1.0) -> INT32 + exponent.
+% Runtime operation: result = (accumulator * multiplier) >> 31 >> shift + zero_point.
+% No floating-point in INT8 inference path.
+%
+% TODO: Write requantization subsection
+% Consider including Algorithm environment with pseudocode
+
+% ---------------------------------------------------------------------------
+\subsection{LUT-Based Activation Functions}
+\label{sec:quant_lut}
+
+% For each quantized activation (sigmoid, tanh, GELU), precompute 256-entry LUT
+% at model load time.
+% LUT maps every INT8 input to INT8 output: O(1) activation, 256 bytes memory.
+% Accuracy comparison: LUT vs full-precision for sigmoid/tanh.
+%
+% TODO: Write LUT subsection
+% TODO: Reference benchmark_accuracy figure/table
