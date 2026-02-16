@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+        fi
+
+    - name: Configure
+      run: |
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          export CC=clang
+        fi
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DEDGENN_ENABLE_LOGGING=ON \
+          -DEDGENN_BUILD_TESTS=ON \
+          -DEDGENN_BUILD_EXAMPLES=ON
+
+    - name: Build
+      run: cmake --build build --parallel $(nproc)
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure --timeout 60
+
+    - name: Run example
+      run: ./build/examples/example_hello
+
+  # Static analysis job
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install cppcheck
+      run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=warning,style,performance \
+          --suppress=missingIncludeSystem \
+          --error-exitcode=1 \
+          --inline-suppr \
+          -I include/ \
+          src/ 2>&1 | tee cppcheck_report.txt
+
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cppcheck-report
+        path: cppcheck_report.txt
+
+  # Memory sanitizer job (catches buffer overflows in tests)
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure with sanitizers
+      run: |
+        cmake -B build-san \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DEDGENN_ENABLE_LOGGING=ON \
+          -DEDGENN_BUILD_TESTS=ON
+
+    - name: Build
+      run: cmake --build build-san --parallel $(nproc)
+
+    - name: Test with sanitizers
+      run: ctest --test-dir build-san --output-on-failure --timeout 120

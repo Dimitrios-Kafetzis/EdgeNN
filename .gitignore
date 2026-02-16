@@ -22,3 +22,4 @@ Thumbs.db
 # Development-only files (not for public distribution)
 CLAUDE.md
 docs/IMPLEMENTATION_PLAN.md
+edgenn-*.md
