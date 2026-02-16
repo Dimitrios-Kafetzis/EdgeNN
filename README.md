@@ -1,9 +1,9 @@
 <!-- Build & Quality -->
 [![CI](https://github.com/Dimitrios-Kafetzis/EdgeNN/actions/workflows/ci.yml/badge.svg)](https://github.com/Dimitrios-Kafetzis/EdgeNN/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![C11](https://img.shields.io/badge/C-C11-00599C.svg?logo=c&logoColor=white)]()
-[![ARM](https://img.shields.io/badge/ARM-Cortex--M%2FA-orange.svg?logo=arm&logoColor=white)]()
-[![Phase 5](https://img.shields.io/badge/Phase%205-Complete-brightgreen.svg)]()
+[![C11](https://img.shields.io/badge/C-C11-00599C.svg?logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
+[![ARM](https://img.shields.io/badge/ARM-Cortex--M%2FA-orange.svg?logo=arm&logoColor=white)](https://developer.arm.com/ip-products/processors/cortex-m)
+[![Phase 5](https://img.shields.io/badge/Phase%205-Complete-brightgreen.svg)](#roadmap)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![GitHub stars](https://img.shields.io/github/stars/Dimitrios-Kafetzis/EdgeNN.svg?style=social)](https://github.com/Dimitrios-Kafetzis/EdgeNN/stargazers)
 
