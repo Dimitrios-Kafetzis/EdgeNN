@@ -1,0 +1,11 @@
+title: "Show & Tell"
+labels: ["showcase"]
+body:
+  - type: markdown
+    attributes:
+      value: Share what you've built with EdgeNN!
+  - type: textarea
+    id: project
+    attributes:
+      label: Your Project
+      description: Describe what you built, which hardware, which model

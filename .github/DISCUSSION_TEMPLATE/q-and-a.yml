@@ -1,0 +1,10 @@
+title: "Q&A"
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: Ask questions about using EdgeNN, building, deploying, or integrating.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question

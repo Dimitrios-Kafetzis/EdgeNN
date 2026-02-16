@@ -1,0 +1,11 @@
+title: "Ideas & Feature Discussion"
+labels: ["discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: Share ideas for EdgeNN features, architecture decisions, or use cases.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your Idea
+      description: Describe your idea or topic for discussion
