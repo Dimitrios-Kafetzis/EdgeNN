@@ -9,41 +9,272 @@
 \subsection{Architecture Overview}
 \label{sec:arch_overview}
 
-% Present the 6-layer stack diagram (Figure 1).
-% Explain layer dependencies and the flow from user API to hardware.
-%
-% TODO: Write overview and reference architecture_stack figure
+EdgeNN is organized as a six-layer stack, where each layer depends only on
+layers below it (Figure~\ref{fig:architecture}).  The lowest layer
+(\emph{Platform BSP}) provides memory-mapped register definitions, clock
+configuration, and DMA access for a specific board.  Layer~2 (\emph{Hardware
+Abstraction}) wraps platform-specific facilities behind a portable API:
+cycle counter access, memory copy, and SIMD backend selection.  Layer~3
+(\emph{Quantization \& Math}) implements the numerical core: INT8/INT16/FP32
+matrix multiplication, activation functions, requantization, and LUT
+generation.  Layer~4 (\emph{Operator Kernels}) provides the 18 operators
+organized into DNN, RNN, Transformer, and Utility categories, each implemented
+as an independent translation unit.  Layer~5 (\emph{Graph Runtime}) manages
+layer sequencing, scratch arena allocation, and the ping-pong buffer scheme.
+Layer~6 (\emph{User API}) exposes model loading and inference through a
+minimal public interface.
+
+This strict layering ensures that operator kernels do not depend on the graph
+runtime (enabling standalone use), and that the math backend does not depend on
+any operator (enabling reuse in custom kernels).
+
+\begin{figure}[t]
+\centering
+% TODO: Replace with TikZ diagram from figures/architecture_stack.tex
+% The diagram should show 6 horizontal layers stacked vertically:
+%   Layer 6 (top, blue):    User API — edgenn_model_load, edgenn_infer
+%   Layer 5 (green):        Graph Runtime — static executor, buffer mgmt
+%   Layer 4 (orange, split): Operator Kernels — DNN | RNN | Transformer | Utility
+%   Layer 3 (purple):       Quantization & Math — INT8/INT16/FP32, LUTs
+%   Layer 2 (red, split):   HAL — Generic C | CMSIS-NN | Helium | NEON
+%   Layer 1 (bottom, gray): Platform BSP — memory map, clock, DMA
+% Downward arrows between layers indicate dependency direction.
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2em}%
+\textit{[TikZ architecture stack diagram --- see}
+\texttt{figures/architecture\_stack.tex]}%
+\vspace{2em}}}
+\caption{EdgeNN six-layer architecture stack.  Each layer depends only on
+layers below it.  Operator kernels (Layer~4) are independent translation
+units, enabling dead code elimination via LTO.}
+\label{fig:architecture}
+\end{figure}
 
 % ---------------------------------------------------------------------------
 \subsection{Memory Management}
 \label{sec:arch_memory}
 
-% Arena allocator: bump pointer, O(1) allocation, zero fragmentation.
-% Ping-pong buffer scheme: two buffers alternate between layers.
-% Memory planning: dry-run at model load for peak scratch, weight memory.
-% Diagram: Flash zones vs SRAM zones.
-% Memory budget analysis for three example models.
-%
-% TODO: Write memory management subsection
-% TODO: Reference arena_pingpong figure
+All memory in EdgeNN is managed through arena allocators---contiguous buffers
+with a bump pointer that provides $O(1)$ allocation and zero fragmentation.
+Listing~\ref{lst:arena} shows the arena structure.
+
+\begin{lstlisting}[caption={Arena allocator structure.},label={lst:arena},float=t]
+typedef struct {
+    uint8_t  *base;       /* Base address of arena memory      */
+    size_t    capacity;   /* Total capacity in bytes           */
+    size_t    offset;     /* Current allocation watermark      */
+    size_t    peak;       /* Peak usage (high watermark)       */
+    uint32_t  alloc_count;/* Allocations since last reset      */
+} edgenn_arena_t;
+\end{lstlisting}
+
+Allocation advances the \texttt{offset} field by the requested size (rounded
+up to \texttt{EDGENN\_TENSOR\_ALIGN} = 16~bytes for SIMD compatibility) and
+returns the previous offset as the allocation pointer.  If the request exceeds
+remaining capacity, the function returns
+\texttt{EDGENN\_ERR\_OUT\_OF\_MEMORY} without modifying state.  The
+\texttt{peak} field tracks the lifetime high watermark, enabling post-inference
+analysis of actual memory consumption.
+
+Two arenas serve distinct roles at runtime.  The \emph{weight arena} holds
+model weights, bias tensors, and quantization parameter arrays; it is populated
+once at model load time and is never freed during the model's lifetime.  The
+\emph{scratch arena} holds layer activations and temporary buffers; it is
+managed by the ping-pong buffer scheme described below.
+
+\subsubsection{Ping-Pong Buffer Scheme}
+
+During sequential inference, the output tensor of layer~$l$ becomes the input
+tensor of layer~$l+1$.  Rather than maintaining separate input and output
+buffers for every layer---which would require memory proportional to the sum
+of all activation sizes---EdgeNN employs a ping-pong scheme with two scratch
+regions of equal size:
+
+\begin{lstlisting}[caption={Ping-pong buffer manager.},label={lst:pingpong}]
+typedef struct {
+    edgenn_arena_t  arena_a;  /* Scratch buffer A         */
+    edgenn_arena_t  arena_b;  /* Scratch buffer B         */
+    uint8_t         active;   /* Currently the "output"   */
+} edgenn_pingpong_t;
+\end{lstlisting}
+
+At each layer boundary, the runtime calls \texttt{edgenn\_pingpong\_swap()},
+which toggles the \texttt{active} flag and resets the arena that was previously
+used for input (and is now the next output target).  This achieves three
+properties: (i)~no data copies between layers, (ii)~peak SRAM usage equals
+$2 \times \max_l(\textit{activation\_size}(l))$ rather than the sum, and
+(iii)~allocation and deallocation are each $O(1)$.  For models where the
+maximum activation size is substantially smaller than the sum, this scheme
+reduces peak SRAM by approximately 50\%.
+
+\subsubsection{Memory Planning}
+
+At model load time, the runtime performs a dry-run through the layer
+descriptors to compute (a)~the maximum activation size across all layers,
+which determines the scratch arena capacity, (b)~the total weight memory
+required, and (c)~the number and size of persistent state buffers (e.g.,
+LSTM hidden and cell state, Transformer KV cache).  These values allow the
+user to provision exactly the required memory at compile time.
+
+\begin{figure}[t]
+\centering
+% TODO: Replace with TikZ diagram from figures/arena_pingpong.tex
+% The diagram should show two subfigures:
+%   (a) Arena bump pointer: a horizontal bar divided into [allocated | free],
+%       with an arrow at the offset position.
+%   (b) Ping-pong during 4-layer inference: two horizontal bars (A, B)
+%       with alternating shading showing which is input vs output at each step.
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2em}%
+\textit{[TikZ memory layout diagram --- see}
+\texttt{figures/arena\_pingpong.tex]}%
+\vspace{2em}}}
+\caption{(a)~Arena bump-pointer allocation. (b)~Ping-pong buffer scheme
+during four-layer inference: buffers A and B alternate roles, with the
+consumed input buffer reset for reuse as the next output.}
+\label{fig:memory}
+\end{figure}
+
+Table~\ref{tab:memory_budget} presents memory budgets for three representative
+model configurations, demonstrating that a range of architectures fit within
+the SRAM constraints of commodity Cortex-M7 devices.
+
+\begin{table}[t]
+\centering
+\caption{Memory budgets for representative models.  Peak activations reflect
+the ping-pong scheme ($2 \times \max$ layer activation size).}
+\label{tab:memory_budget}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Model & Weights & Peak Activations & Total SRAM \\
+\midrule
+Keyword Spotting (3$\times$Dense)         & 40\,KB  & 2\,KB  & 42\,KB  \\
+Anomaly Detection (2-layer LSTM)          & 120\,KB & 8\,KB  & 128\,KB \\
+Tiny Transformer (2L, $d$=64, seq=32)     & 200\,KB & 32\,KB & 232\,KB \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ---------------------------------------------------------------------------
 \subsection{Tensor Descriptor Design}
 \label{sec:arch_tensor}
 
-% Show the struct definition (code listing).
-% Explain quantization parameters (per-tensor, per-channel, fixed-point).
-% Layout support (NHWC, NCHW, NC, NTC) and stride computation.
-%
-% TODO: Write tensor descriptor subsection
+The tensor descriptor is the central data structure through which all operators
+communicate.  Listing~\ref{lst:tensor} shows its definition.
+
+\begin{lstlisting}[caption={Tensor descriptor (does not own data).},label={lst:tensor},float=t]
+typedef struct edgenn_tensor {
+    void            *data;                  /* Raw data pointer          */
+    int32_t          shape[EDGENN_MAX_DIMS];/* Up to 4 dimensions       */
+    int32_t          strides[EDGENN_MAX_DIMS];/* Element strides        */
+    uint8_t          ndim;                  /* Active dimensions (1-4)  */
+    edgenn_dtype_t   dtype;                 /* INT8, INT16, INT32, FP32 */
+    edgenn_layout_t  layout;               /* NHWC, NCHW, NC, NTC      */
+    edgenn_qparams_t qparams;              /* Quantization parameters   */
+} edgenn_tensor_t;
+\end{lstlisting}
+
+The \texttt{data} pointer is untyped (\texttt{void*}) and may reference
+SRAM (arena-allocated activations), Flash (memory-mapped weights), or
+user-supplied buffers.  The \texttt{shape} and \texttt{strides} arrays support
+up to \texttt{EDGENN\_MAX\_DIMS}~=~4 dimensions, sufficient for batch,
+spatial, and channel dimensions in all supported architectures.  Strides are
+computed automatically in row-major order by \texttt{edgenn\_tensor\_init()},
+but may be overridden for non-contiguous views created by
+\texttt{edgenn\_tensor\_slice\_dim0()}.
+
+The \texttt{layout} field encodes the dimension ordering convention:
+\texttt{NHWC} for convolutional layers
+(batch$\times$height$\times$width$\times$channels),
+\texttt{NC} for dense layers (batch$\times$features), and \texttt{NTC} for
+recurrent and Transformer layers (batch$\times$time$\times$channels).
+
+The embedded \texttt{qparams} structure carries the complete quantization
+context:
+
+\begin{lstlisting}[caption={Quantization parameters.},label={lst:qparams}]
+typedef struct {
+    edgenn_qscheme_t  scheme;         /* NONE, SYMMETRIC, PER_CHANNEL */
+    float             scale;          /* Per-tensor scale factor      */
+    int32_t           zero_point;     /* Per-tensor zero point        */
+    const float      *channel_scales; /* Per-channel (NULL if unused) */
+    const int32_t    *channel_zps;    /* Per-channel zero points      */
+    int32_t           n_channels;     /* Number of output channels    */
+    int32_t           multiplier;     /* Fixed-point multiplier       */
+    int8_t            shift;          /* Right-shift amount           */
+} edgenn_qparams_t;
+\end{lstlisting}
+
+The \texttt{multiplier} and \texttt{shift} fields enable pure-integer
+requantization without floating-point operations at inference time
+(Section~\ref{sec:quant_requantize}).  Per-channel arrays
+(\texttt{channel\_scales}, \texttt{channel\_zps}) point into the weight arena
+and are shared across all tensors using the same channel quantization,
+avoiding duplication.  This design ensures that a tensor descriptor carries
+sufficient metadata for any receiving operator---or any partition
+boundary---to interpret and process the data without external context.
 
 % ---------------------------------------------------------------------------
 \subsection{Static Graph Runtime}
 \label{sec:arch_runtime}
 
-% Layer descriptor array with op_type, params pointer, tensor indices.
-% Sequential execution with kernel dispatch.
-% Profiling hooks (cycle counter per layer).
-% Comparison with TFLite Micro's interpreter dispatch.
-%
-% TODO: Write runtime subsection
+The graph runtime executes a model as a linear sequence of layer descriptors.
+Each descriptor (Listing~\ref{lst:layer_desc}) specifies the operator type,
+a pointer to operator-specific parameters (e.g., \texttt{edgenn\_dense\_params\_t}),
+and indices into a shared tensor table.
+
+\begin{lstlisting}[caption={Layer descriptor in the execution graph.},label={lst:layer_desc}]
+typedef struct {
+    edgenn_op_type_t  op_type;     /* Operator type enum       */
+    void             *params;      /* Op-specific params       */
+    int32_t           input_idx;   /* Input tensor index       */
+    int32_t           output_idx;  /* Output tensor index      */
+    int32_t           aux_idx;     /* Secondary input (e.g.,   */
+                                   /*   residual connection)   */
+    uint32_t          cycles;      /* Profiling: cycle count   */
+} edgenn_layer_desc_t;
+\end{lstlisting}
+
+The graph context (\texttt{edgenn\_graph\_t}) maintains arrays of up to
+\texttt{EDGENN\_MAX\_LAYERS}~=~256 layer descriptors and
+\texttt{EDGENN\_MAX\_TENSORS}~=~512 tensor descriptors, along with pointers
+to the weight and scratch arenas.
+
+\subsubsection{Execution Model}
+
+Inference proceeds by iterating over the layer descriptor array.  For each
+layer, the runtime: (i)~retrieves the input and output tensor descriptors
+from the tensor table, (ii)~saves the scratch arena state, (iii)~dispatches
+to the appropriate operator kernel via a \texttt{switch} statement on
+\texttt{op\_type}, (iv)~records the cycle count if profiling is enabled, and
+(v)~restores or swaps the scratch arena for the next layer.
+
+This dispatch mechanism differs fundamentally from
+TFLite~Micro's interpreter, which uses a registration table of
+\texttt{TfLiteRegistration} structs containing function pointers for
+\texttt{Init}, \texttt{Prepare}, and \texttt{Invoke} phases.  EdgeNN's
+\texttt{switch}-based dispatch has two advantages: the compiler can inline
+small operators (e.g., ReLU, reshape), and the linker's dead code
+elimination removes unreachable \texttt{case} branches, ensuring that only
+operators present in the model contribute to the final binary size.
+
+\subsubsection{Profiling Hooks}
+
+When \texttt{EDGENN\_ENABLE\_PROFILING} is defined at compile time, the
+runtime reads the DWT cycle counter (via \texttt{edgenn\_hal\_cycle\_count()})
+before and after each operator invocation, storing the delta in the layer
+descriptor's \texttt{cycles} field.  After inference,
+\texttt{edgenn\_graph\_print\_summary()} produces a per-layer breakdown that
+identifies computational bottlenecks without requiring external profiling tools.
+This facility is compile-time removable: when profiling is disabled, the
+cycle counter reads and storage are entirely absent from the binary.
+
+\subsubsection{Binary Model Format}
+
+The \texttt{.edgenn} binary format provides a compact, zero-copy-friendly
+representation.  A 44-byte header contains the magic number
+(\texttt{0x454E4E45}), format version, layer and tensor counts, weight data
+size, and flags.  The weight data blob follows at a 16-byte-aligned offset,
+allowing the model loader to assign the \texttt{data} pointer of weight
+tensors directly into the buffer---or, when the model resides in Flash,
+to memory-map the weights with no RAM copy required.  This zero-copy loading
+ensures that model initialization time is dominated by the memory planning
+dry-run rather than by data movement.
