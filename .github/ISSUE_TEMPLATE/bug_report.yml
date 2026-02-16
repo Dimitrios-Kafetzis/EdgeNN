@@ -1,0 +1,55 @@
+name: Bug Report
+description: Report a bug in EdgeNN
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a bug! Please fill in the details below.
+
+  - type: input
+    id: version
+    attributes:
+      label: EdgeNN Version
+      description: Which version or commit hash?
+      placeholder: "v0.1.0 or commit abc1234"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target Platform
+      options:
+        - Host (x86_64 Linux)
+        - Host (macOS)
+        - STM32F4 (Cortex-M4)
+        - STM32F7/H7 (Cortex-M7)
+        - NXP i.MX RT (Cortex-M7)
+        - Cortex-M33/M55
+        - Raspberry Pi (Cortex-A)
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal code or steps to trigger the bug
+      render: c
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Build/Test Output
+      description: Paste any relevant compiler output or test failures
+      render: shell
